@@ -16,7 +16,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'docker-demo', url: 'https://github.com/arytiw/dhanyukti.git'
+                git branch: 'main', url: 'https://github.com/arytiw/dhanyukti.git'
             }
         }
 
