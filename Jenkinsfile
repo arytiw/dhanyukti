@@ -2,20 +2,16 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "arytiw/dhanyukti" // lowercase is safer
-        IMAGE_TAG = "jenkins"
+        IMAGE_NAME = "arytiw/dhanyukti"
+        IMAGE_TAG  = "jenkins"
+        // Ensure this matches the ID in Jenkins -> Credentials
+        DOCKER_HUB_CRED_ID = "dockerhubcreds" 
     }
 
     stages {
-
-        stage('Try') {
-            steps {
-                echo "hello i have started"
-            }
-        }
-
         stage('Checkout Code') {
             steps {
+                // Using 'main' as requested earlier
                 git branch: 'main', url: 'https://github.com/arytiw/dhanyukti.git'
             }
         }
@@ -23,9 +19,9 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    echo "Building Docker image..."
-                    def customImage = docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
-                    env.IMAGE_ID = customImage.id
+                    echo "Building: ${IMAGE_NAME}:${IMAGE_TAG}"
+                    // Building and keeping a reference to the image object
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 }
             }
         }
@@ -33,7 +29,8 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhubcreds') {
+                    // Leaving the URL empty "" is the safest way to target Docker Hub
+                    docker.withRegistry('', "${DOCKER_HUB_CRED_ID}") {
                         docker.image("${IMAGE_NAME}:${IMAGE_TAG}").push()
                     }
                 }
@@ -42,7 +39,13 @@ pipeline {
     }
 
     post {
-        success { echo "Docker image successfully built and pushed " }
-        failure { echo "Pipeline failed " }
+        success { echo "Success: ${IMAGE_NAME}:${IMAGE_TAG} is now on Docker Hub" }
+        failure { 
+            echo "Pipeline failed. Check if 'dockerhubcreds' matches your Jenkins Credential ID." 
+        }
+        always {
+            // Clean up local images to save disk space on the Jenkins agent
+            sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
+        }
     }
 }
