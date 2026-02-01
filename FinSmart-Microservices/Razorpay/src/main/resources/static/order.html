@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Test</title>
+</head>
+<body>
+
+<button id="payBtn">Pay Now</button>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script>
+document.getElementById('payBtn').onclick = async function () {
+    console.log('[checkout] createOrder - start', new Date().toISOString());
+    try {
+        const createResp = await fetch('/api/razorpay/create-order', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({amount: 500, currency: 'INR'})
+        });
+
+        const text = await createResp.text();
+        const order = JSON.parse(text);
+        console.log('[checkout] createOrder - response', order);
+
+        const options = {
+            "key": "rzp_test_Rrz09ERfzDOoli",
+            "amount": order.amount,
+            "currency": order.currency,
+            "name": "Test Payment",
+            "description": "Razorpay Microservice Test",
+            "order_id": order.id,
+            "handler": function (response){
+                console.log('[checkout] handler response', response, new Date().toISOString());
+
+                // Post to server for verification
+                fetch('/api/razorpay/verify-payment', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        razorpayOrderId: order.id,
+                        razorpayPaymentId: response.razorpay_payment_id,
+                        razorpaySignature: response.razorpay_signature
+                    })
+                }).then(res => res.json())
+                  .then(data => {
+                      console.log('[checkout] verify-response', data);
+                      alert(JSON.stringify(data));
+                  }).catch(err => {
+                      console.error('[checkout] verify-error', err);
+                      alert('Verification failed. See console for details.');
+                  });
+            },
+            "theme": {"color": "#3399cc"}
+        };
+
+        const rzp = new Razorpay(options);
+        console.log('[checkout] opening checkout', new Date().toISOString());
+        rzp.open();
+
+        // Watchdog: if handler isn't called within 90s, warn in console (OTP may be delayed)
+        setTimeout(() => {
+            console.warn('[checkout] No handler callback within 90 seconds - possible OTP delay or failure');
+        }, 90000);
+
+    } catch (err) {
+        console.error('[checkout] createOrder error', err);
+        alert('Error creating order. Check console for details.');
+    }
+};
+</script>
+
+</body>
+</html>
